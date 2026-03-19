@@ -31,7 +31,7 @@ pub enum OutputFormat {
 pub enum Commands {
     /// Run an AI CLI tool and automatically sync its chat history
     Run {
-        /// The AI tool to run (codex, claude, gemini)
+        /// The AI tool to run (codex, claude, gemini, coco)
         agent: Option<String>,
 
         /// Additional arguments to pass to the agent

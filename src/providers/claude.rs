@@ -363,7 +363,6 @@ struct ClaudeUsage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::providers::base::{MessageRole, Provider};
 
     // Helper to create a user message event with content
     fn create_user_event(content: &str) -> ClaudeEvent {
