@@ -1,12 +1,26 @@
-use crate::error::{Result, WaylogError};
+use crate::error::Result;
 use crate::init::{subdirs, WAYLOG_DIR};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
 /// Get the home directory in a cross-platform way
 pub fn home_dir() -> Result<PathBuf> {
-    home::home_dir()
-        .ok_or_else(|| WaylogError::PathError("Could not find home directory".to_string()))
+    #[cfg(test)]
+    {
+        // Use a unique directory per test run to prevent tests from modifying
+        // the actual user's home directory. We use thread id to make it more unique.
+        let thread_id = format!("{:?}", std::thread::current().id());
+        let sanitized_id =
+            thread_id.replace(&['T', 'h', 'r', 'e', 'a', 'd', 'I', 'd', '(', ')'][..], "");
+        let test_home = std::env::temp_dir().join(format!("waylog_test_home_{}", sanitized_id));
+        let _ = std::fs::create_dir_all(&test_home);
+        return Ok(test_home);
+    }
+
+    #[cfg(not(test))]
+    home::home_dir().ok_or_else(|| {
+        crate::error::WaylogError::PathError("Could not find home directory".to_string())
+    })
 }
 
 /// Get the data directory for AI tools
@@ -60,21 +74,54 @@ pub fn encode_path_gemini(path: &Path) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-/// Get the .waylog/history directory for the current project
+/// Get the .waylog/history directory for the current project in the user's home directory
 pub fn get_waylog_dir(project_dir: &Path) -> PathBuf {
-    project_dir.join(WAYLOG_DIR).join(subdirs::HISTORY)
+    let home = home_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let project_name = project_dir
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+
+    // Fallback to "default" if project_name is empty
+    let dir_name = if project_name.is_empty() {
+        "default".to_string()
+    } else {
+        project_name
+    };
+
+    home.join(WAYLOG_DIR).join(subdirs::HISTORY).join(dir_name)
 }
 
-/// Find the project root by looking for .waylog folder or .git folder
+/// Get the .waylog/logs directory for the current project in the user's home directory
+pub fn get_log_dir(project_dir: &Path) -> PathBuf {
+    let home = home_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let project_name = project_dir
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+
+    // Fallback to "default" if project_name is empty
+    let dir_name = if project_name.is_empty() {
+        "default".to_string()
+    } else {
+        project_name
+    };
+
+    home.join(WAYLOG_DIR).join(subdirs::LOGS).join(dir_name)
+}
+
+/// Find the project root by looking for .git folder
 /// moving upwards from the current directory.
 /// If we reach the home directory or the system root without finding a marker,
-/// returns the current directory to avoid treat the whole home as a project.
+/// returns the current directory.
 pub fn find_project_root() -> Option<PathBuf> {
     let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let home = home_dir().ok();
 
     for path in current_dir.ancestors() {
-        if path.join(WAYLOG_DIR).is_dir() {
+        if path.join(".git").is_dir() {
             return Some(path.to_path_buf());
         }
 
@@ -216,10 +263,9 @@ mod tests {
         let project_dir = std::env::temp_dir().join("test-project");
         let waylog_dir = get_waylog_dir(&project_dir);
 
-        let expected = project_dir.join(".waylog").join("history");
+        let home = home_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let expected = home.join(".waylog").join("history").join("test-project");
         assert_eq!(waylog_dir, expected);
-        // Check path ends with correct components (platform-independent)
-        assert!(waylog_dir.ends_with(Path::new(".waylog").join("history")));
     }
 
     #[test]
@@ -251,9 +297,9 @@ mod tests {
         let project_root = temp_dir.path().join("project");
         let subdir = project_root.join("subdir").join("deep");
 
-        // Create project root directory and .waylog directory
+        // Create project root directory and .git directory
         fs::create_dir_all(&subdir).unwrap();
-        fs::create_dir_all(project_root.join(".waylog")).unwrap();
+        fs::create_dir_all(project_root.join(".git")).unwrap();
 
         // Save current working directory
         let original_dir = std::env::current_dir().unwrap();
@@ -266,8 +312,8 @@ mod tests {
         assert!(found_root.is_some());
 
         let found = found_root.unwrap();
-        // Verify the found path contains .waylog directory
-        assert!(found.join(".waylog").exists());
+        // Verify the found path contains .git directory
+        assert!(found.join(".git").exists());
         // Compare paths by checking they resolve to the same directory
         // Use file_name to avoid issues with different path representations
         assert_eq!(
@@ -282,7 +328,7 @@ mod tests {
 
     #[test]
     fn test_find_project_root_not_found() {
-        // Create temporary directory but don't create .waylog
+        // Create temporary directory but don't create .git
         let temp_dir = TempDir::new().unwrap();
         let subdir = temp_dir.path().join("subdir");
         fs::create_dir_all(&subdir).unwrap();
@@ -293,10 +339,10 @@ mod tests {
         // Switch to subdirectory
         std::env::set_current_dir(&subdir).unwrap();
 
-        // Should not find project root (not in home directory and no .waylog)
+        // Should not find project root (not in home directory and no .git)
         // Note: This test may behave differently in different environments, depending on temp_dir location
         // If temp_dir is under home directory, find_project_root will stop at home and return None
-        // If not, it will also return None (because .waylog was not found)
+        // If not, it will also return None (because .git was not found)
         let _found_root = find_project_root();
         // In test environment, temp_dir is usually not under home, so should return None
         // But we don't enforce assertion because behavior may vary by environment

@@ -13,7 +13,7 @@ WayLog CLI is a lightweight tool written in Rust that automatically saves your A
 
 ## ✨ Features
 
-- **🔄 Auto-Sync**: Real-time synchronization of chat history to `.waylog/history/` as you type.
+- **🔄 Auto-Sync**: Real-time synchronization of chat history to `~/.waylog/history/<project_name>` as you type.
 - **📦 Full History Recovery**: The `pull` command scans your entire machine to recover past sessions into the current project.
 - **📝 Markdown Native**: All history is saved as high-quality Markdown files with frontmatter metadata.
 
@@ -64,7 +64,7 @@ waylog run codex
 
 ### 2. Full Sync / Recover History (`pull`)
 
-Scans your local AI provider storage and "pulls" all relevant sessions into your project's `.waylog` folder.
+Scans your local AI provider storage and "pulls" all relevant sessions into your project's `~/.waylog/history/<project_name>` folder.
 
 
 

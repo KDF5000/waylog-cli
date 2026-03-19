@@ -136,9 +136,16 @@ test_case "Non-terminal output (piped, no color)" "cargo run -- --help 2>&1 | ca
 # 6. Logging Tests
 section "Logging Tests"
 
+# Determine project name to locate log file in ~/.waylog/logs/
+PROJECT_NAME=$(basename "$PWD")
+if [ -z "$PROJECT_NAME" ]; then
+    PROJECT_NAME="default"
+fi
+LOG_DIR="$HOME/.waylog/logs/$PROJECT_NAME"
+
 # Check if log file is created in verbose mode
-if [ -d ".waylog/logs" ]; then
-    test_case "Log file creation (verbose mode)" "[ -f .waylog/logs/waylog.log.\$(date +%Y-%m-%d) ]" 0
+if [ -d "$LOG_DIR" ]; then
+    test_case "Log file creation (verbose mode)" "[ -f \"$LOG_DIR/waylog.log.\$(date +%Y-%m-%d)\" ]" 0
 else
     echo -e "  ${YELLOW}⚠ SKIP${NC} (log directory not found, run with --verbose first)"
     ((SKIPPED++))

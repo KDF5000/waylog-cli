@@ -34,7 +34,7 @@ pub fn resolve_project_root(command: &Commands, output: &mut Output) -> Result<(
             None => {
                 // Interactive prompt for initialization
                 let current_dir = std::env::current_dir()?;
-                let waylog_path = current_dir.join(WAYLOG_DIR);
+                let waylog_path = crate::utils::path::get_waylog_dir(&current_dir);
 
                 output.not_initialized()?;
                 output.init_prompt(&waylog_path)?;
@@ -78,7 +78,7 @@ pub fn setup_logging(project_root: &Path, verbose: bool, quiet: bool) -> Result<
 
     // Build subscriber with conditional layers
     if verbose {
-        let log_dir = project_root.join(WAYLOG_DIR).join(subdirs::LOGS);
+        let log_dir = crate::utils::path::get_log_dir(project_root);
 
         // Create log directory if it doesn't exist
         std::fs::create_dir_all(&log_dir)?;
